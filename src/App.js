@@ -1,114 +1,97 @@
-import React, { Component } from 'react';
-import imagesApi from './Components/imagesApi';
+import { useEffect, useState } from "react";
+import ImagesApi from './Components/imagesApi';
 import Searchbar from './Components/Searchbar/Searchbar';
-import ImageGalleryItem from './Components/ImageGalleryItem/ImageGalleryItem';
 import ImageGallery from './Components/ImageGallery/ImageGallery';
 import Button from './Components/Button/Button';
 import Modal from './Components/Modal/Modal';
 import Loader from 'react-loader-spinner';
 
-import './App.css';
+import styles from './App.module.css';
 
-class App extends Component {
-  state = {
-    images: [],
-    currentPage: 1,
-    currentPageImages: [],
-    searchQuery: '',
-    isLoading: false,
-    error: null,
-    largeImage: '',
-    showModal: false,
-    modalUrl: '',
-    modalAlt: '',
+export default function App() {
+  const [pictures, setPictures] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState("");
+  const [tags, setTags] = useState("");
+
+  useEffect(() => {
+    if (!searchQuery) {
+      return;
+    }
+
+    fetchImages();
+  }, [searchQuery]);
+
+  const onChangeQuery = (query) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+    setPictures([]);
   };
 
-  componentDidMount() {
-  }
+  const onModal = ({ largeImageURL, tags }) => {
+    setLargeImageURL(largeImageURL);
+    setTags(tags);
+    toggleModal();
+  };
 
-  componentDidUpdate(prevProps, prevState) {
-    if (prevState.searchQuery !== this.state.searchQuery) {
-      this.fetchImages();
-    }
-  }
+  const toggleModal = () => {
+    setShowModal(!showModal);
+  };
 
-  toggleModal = () => {
-    this.setState(({ showModal }) => ({
-      showModal: !showModal,
-    }))
-  }
+  const fetchImages = () => {
+    setIsLoading(true);
 
-  onChangeQuery = searchQuery => {
-    this.setState({ 
-      searchQuery: searchQuery, 
-      currentPage: 1, 
-      images: [], 
-      error: null, 
-    })
-  }
-
-  fetchImages = () => {
-    const { searchQuery, currentPage } = this.state;
     const options = { searchQuery, currentPage };
 
-    this.setState({ isLoading: true });
-
-    imagesApi
-    .fetchImages(options)
-    .then(images => {
-      this.setState( prevState => ({
-        images: [...prevState.images, ...images], 
-        currentPage: prevState.currentPage + 1,
-        currentPageImages: [...images], 
-      }));
-      if (images.length === 0) {
-          this.setState({
-            error: 'Nothing was find by your query. Try again.',});
-      }})
-    .catch(error => this.setState({ error: error.message }))
-    .finally(() => this.setState({ isLoading: false }));
+    ImagesApi.fetchImages(options)
+      .then((images) => {
+        if (images.length === 0) {
+          alert.info("Try again!");
+        }
+        setPictures([...pictures, ...images]);
+        setCurrentPage(currentPage + 1);
+      })
+      .then(() => {
+        window.scrollTo({
+          top: document.documentElement.scrollHeight,
+          behavior: "smooth",
+        });
+      })
+      .catch(() => {
+        alert.info("Try again!");
+      })
+      .finally(() => setIsLoading(false));
   };
 
-  onClickImageGalleryItem = e => {
-    this.setState({
-      modalUrl: e.currentTarget.getAttribute('url'),
-      modalAlt: e.currentTarget.getAttribute('alt'),
-    });
-    this.toggleModal();
-  };
+  const shouldRenderLoadMoreButton = pictures.length > 0 && !isLoading;
 
-    render()
-    {
-    const { images, currentPageImages, isLoading, error, showModal, modalAlt, modalUrl } = this.state;
-    const shouldRenderLoadMoreButton = !(currentPageImages.length < 12) && !isLoading;
+  return (
+    <div className={styles.App}>
+      <Searchbar onSubmit={onChangeQuery} />
+      <ImageGallery pictures={pictures} onClick={onModal} />
 
-      return (
-        <>
-        <Searchbar onChangeQuery={this.onChangeQuery} />
-        {error && (
-          <p style={{ color: 'red', textAlign: 'center', fontSize: '20px' }}>
-            This is error: {error}
-          </p>
-        )}
+      {shouldRenderLoadMoreButton && <Button onClick={fetchImages} />}
 
-        <ImageGallery>
-          {images.map(({ id, tags, webformatURL, largeImageURL }) => (
-            <ImageGalleryItem key={id} alt={tags} src={webformatURL} url={largeImageURL} onClick={this.onClickImageGalleryItem} />
-          ))}
-        </ImageGallery>
-        { isLoading && <Loader type="Bars" color="#00BFFF" height={80} width={80} /> }       
+      {isLoading && (
+        <Loader
+          type="Puff"
+          color="#00BFFF"
+          height={100}
+          width={100}
 
-        { shouldRenderLoadMoreButton && 
-          <Button onFetchImages={this.fetchImages}/> }
+        />
+      )}
 
-        {showModal && (
-          <Modal src={modalUrl} alt={modalAlt} onClose={this.toggleModal} />
-        )}  
-      </>      
-    )    
-  }   
-};
-
-export default App;
+      {showModal && (
+        <Modal onClose={toggleModal}>
+          <img src={largeImageURL} alt={tags} />
+        </Modal>
+      )}
+    </div>
+  );
+}
 
 
